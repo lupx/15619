@@ -68,7 +68,7 @@ public class Decrypt {
      */
     static int getKeyZ (String keyParameter) {
         BigInteger keyY = new BigInteger(keyParameter);
-        BigInteger gcd = getGCD(secretKey, keyY);
+        BigInteger gcd = getGCD(secretKey);
         return 1 + gcd.mod(new BigInteger("25")).intValue();
     }
 

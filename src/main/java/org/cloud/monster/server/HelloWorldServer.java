@@ -44,17 +44,19 @@ public class HelloWorldServer {
                 .setHandler(new HttpHandler() {
                     @Override
                     public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                        if (exchange.isInIoThread()) {
+                            exchange.dispatch(this);
+                            return;
+                        }
                         Map<String, Deque<String>> params = exchange.getQueryParameters();
                         String key = params.get("key").poll();
                         String message = params.get("message").poll();
-                        System.out.println(key);
-                        System.out.println(message);
+//                        System.out.println(key);
+//                        System.out.println(message);
                         String rst = Decrypt.decrypt(key, message);
                         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
                         exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
                                          + DateUtil.currentTime() + "\n" + rst + "\n");
-//                        exchange.getResponseSender().send(DateUtil.currentTime() + "\n");
-//                        exchange.getResponseSender().send(rst + "\n");
                     }
                 }).build();
         server.start();
