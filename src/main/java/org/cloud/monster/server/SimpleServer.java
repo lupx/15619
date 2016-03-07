@@ -19,7 +19,7 @@ import java.util.Properties;
  * @author PeixinLu
  */
 @UndertowExample("Hello World")
-public class HelloWorldServer {
+public class SimpleServer {
     private static final String TEAM_ID;
 
     private static final String TEAM_AWS_ACCOUNT_ID;
@@ -28,35 +28,29 @@ public class HelloWorldServer {
     static {
         Properties properties = new Properties();
         try {
-            properties.load(HelloWorldServer.class.getResourceAsStream("/info.properties"));
+            properties.load(SimpleServer.class.getResourceAsStream("/info.properties"));
         } catch (IOException io) {
             System.out.println(io);
         }
         TEAM_ID = properties.getProperty("team_id");
         TEAM_AWS_ACCOUNT_ID = properties.getProperty("team_aws_account_id");
-        DNS = "ec2-54-165-232-72.compute-1.amazonaws.com";
-//        DNS = "localhost";
+//        DNS = "ec2-54-172-11-79.compute-1.amazonaws.com";
+        DNS = "localhost";
     }
 
     public static void main(final String[] args) {
         Undertow server = Undertow.builder()
-                .addHttpListener(80, DNS)
+                .addHttpListener(8080, DNS)
                 .setHandler(new HttpHandler() {
                     @Override
                     public void handleRequest(final HttpServerExchange exchange) throws Exception {
-                        if (exchange.isInIoThread()) {
-                            exchange.dispatch(this);
-                            return;
-                        }
                         Map<String, Deque<String>> params = exchange.getQueryParameters();
                         String key = params.get("key").poll();
                         String message = params.get("message").poll();
-//                        System.out.println(key);
-//                        System.out.println(message);
                         String rst = Decrypt.decrypt(key, message);
                         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
                         exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-                                         + DateUtil.currentTime() + "\n" + rst + "\n");
+                                + DateUtil.currentTime() + "\n" + rst + "\n");
                     }
                 }).build();
         server.start();

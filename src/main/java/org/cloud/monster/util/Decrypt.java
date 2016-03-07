@@ -33,12 +33,12 @@ public class Decrypt {
         BigInteger b1 = new BigInteger("29824881671662318316918906016914781134706550990334208872849272858917042444015119314823149633067286528");
         BigInteger b2 = new BigInteger("64266330917908644872330635228106713310880186591609208114244758680898150367880703152525200743234420230");
 //        BigInteger divisor = new BigInteger("18762");
-//
-        long start = System.currentTimeMillis();
-        BigInteger b3 = getGCD(b1);
-        long end = System.currentTimeMillis();
-        System.out.println(b3);
-        System.out.println("cost :" + (end - start) + "ms");
+        System.out.println(b2.gcd(b1));
+//        long start = System.currentTimeMillis();
+//        BigInteger b3 = getGCD(b1);
+//        long end = System.currentTimeMillis();
+//        System.out.println(b3);
+//        System.out.println("cost :" + (end - start) + "ms");
 
 //        System.out.println(2100 / 140);
 //        System.out.println(gcd(100,500));
@@ -68,7 +68,7 @@ public class Decrypt {
      */
     static int getKeyZ (String keyParameter) {
         BigInteger keyY = new BigInteger(keyParameter);
-        BigInteger gcd = getGCD(secretKey);
+        BigInteger gcd = secretKey.gcd(keyY);
         return 1 + gcd.mod(new BigInteger("25")).intValue();
     }
 
