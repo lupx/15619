@@ -55,7 +55,7 @@ public class Decrypt {
     public static String decrypt(String keyParameter, String message) {
         if (message == null) return null;
         int keyZ = getKeyZ(keyParameter);
-        System.out.println("keyZ = " + keyZ);
+//        System.out.println("keyZ = " + keyZ);
         char[] charArray = getCharArray(message, keyZ);
         return getDecryptedMessage(charArray);
     }
