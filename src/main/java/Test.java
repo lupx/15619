@@ -18,26 +18,8 @@ public class Test {
 //        System.out.println(a);
         char a = '2';
 //        System.out.println(hash("343123fadf"));
-
-        System.out.println("YNEQREREBJUHTTVATOHATANRYHEBERNBNOYRZCAEOVGYHZNUGYYGBCSCXBPRVNTAHEROBFNYNPNJNVHFZHPFBQNQYCZHEGARPGFB".length());
-    }
-
-    private static int hash(String key) {
-        if (key.equals("a")) return 0;
-        if (key.equals("b")) return 1;
-        if (key.equals("c")) return 2;
-
-        if (key.length() == 5) return 0;
-        if (key.length() == 6) return 1;
-        if (key.length() == 9) return 2;
-
-        key = key.toUpperCase();
-        char firstC = key.charAt(0);
-        if (firstC >= '0' && firstC <= '9') return (firstC - '0') % 3;
-
-        if (firstC >= 'A' && firstC <= 'I') return 0;
-        if (firstC >= 'J' && firstC <= 'R') return 1;
-        if (firstC >= 'S' && firstC <= 'Z') return 2;
-        return 0;
+        String b = "naïve \uD83D\uDC4C (´×ω×`)";
+        String c = "https://pbs.twimg.com/media/BnqgpJyIYAAW8jm.jpg";
+        System.out.println(c);
     }
 }
