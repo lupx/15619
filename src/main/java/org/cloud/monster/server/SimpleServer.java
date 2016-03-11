@@ -5,15 +5,14 @@ import io.undertow.examples.UndertowExample;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
+import org.cloud.monster.dataaccess.mysql.TwitterDao;
+import org.cloud.monster.pojo.Twitter;
 import org.cloud.monster.util.DateUtil;
 import org.cloud.monster.util.Decrypt;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Simply run this code, then use browser to test it!
@@ -26,9 +25,16 @@ public class SimpleServer {
     private static final String TEAM_AWS_ACCOUNT_ID;
 
     private static final String DNS;
-
+//
     private static final BigInteger secretKey;
 
+    /**
+     * TEST: only one dao here.
+     * Further, we could provide a array of daos.
+     */
+    private static TwitterDao twitterDao;
+
+//    private static String url;
 
     static {
         Properties properties = new Properties();
@@ -41,10 +47,34 @@ public class SimpleServer {
         TEAM_AWS_ACCOUNT_ID = properties.getProperty("team_aws_account_id");
         secretKey = new BigInteger(properties.getProperty("secret"));
         DNS = "ec2-54-172-11-79.compute-1.amazonaws.com";
+        twitterDao = new TwitterDao("jdbc:mysql://localhost/twitter");
+//        url = "jdbc:mysql://localhost/twitter";
 //        DNS = "localhost";
     }
 
     public static void main(final String[] args) {
+        /**
+         * q1 server:
+         */
+//        Undertow server = Undertow.builder()
+//                .addHttpListener(80, DNS)
+//                .setHandler(new HttpHandler() {
+//                    @Override
+//                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
+//                        Map<String, Deque<String>> params = exchange.getQueryParameters();
+//                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+//                        String key = params.get("key").getFirst();
+//                        String message = params.get("message").getFirst();
+//                        String rst = decrypt(key, message);
+//                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+//                                + DateUtil.currentTime() + "\n" + rst + "\n");
+//                    }
+//                }).build();
+
+
+        /**
+         * q2 server:
+         */
         Undertow server = Undertow.builder()
                 .addHttpListener(80, DNS)
                 .setHandler(new HttpHandler() {
@@ -52,11 +82,16 @@ public class SimpleServer {
                     public void handleRequest(final HttpServerExchange exchange) throws Exception {
                         Map<String, Deque<String>> params = exchange.getQueryParameters();
                         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
-                        String key = params.get("key").getFirst();
-                        String message = params.get("message").getFirst();
-                        String rst = decrypt(key, message);
+                        String userId = params.get("userid").getFirst();
+                        String hashTag = params.get("hashtag").getFirst();
+                        List<Twitter> list = null;
+                        try {
+                            list = twitterDao.retrieveTwitter(userId, hashTag);
+                        } catch (Exception e) {
+
+                        }
                         exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-                                + DateUtil.currentTime() + "\n" + rst + "\n");
+                                + buildResponse(list) + "\n");
                     }
                 }).build();
         server.start();
@@ -143,7 +178,17 @@ public class SimpleServer {
             currentLen = currentLen - 2;
         }
         return sb.toString();
-
     }
 
+    private static String buildResponse(List<Twitter> list) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < list.size(); i ++) {
+            if (i != list.size() - 1) {
+                sb.append(list.get(i).toString()).append("\n");
+            } else {
+                sb.append(list.get(i));
+            }
+        }
+        return sb.toString();
+    }
 }
