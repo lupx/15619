@@ -69,17 +69,54 @@ public class TwitterDao {
         try {
             con = getConnection();
 
-            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.time, t.tweet_id, t.text  from " + tableName
-                    + " AS t where t.user_id= ? and t.hashtag=?");
+//            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.create_time, t.tweet_id, t.text  from " + tableName
+//                    + " AS t where t.user_id=? and t.hashtag=?");
+            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.create_time, t.tweet_id, t.text, t.hashtag  from " + tableName
+                    + " AS t where t.user_id=?"); // test
             pstmt.setString(1, userId);
-            pstmt.setString(2, hashTag);
+//            pstmt.setString(2, hashTag);
+            ResultSet rs = pstmt.executeQuery();
+
+            List<Twitter> list = new ArrayList<>();
+            while (rs.next()) {
+                if (rs.getString("hashtag").equals(hashTag)) {
+                    Twitter t = new Twitter();
+                    t.setScore(rs.getString("score"));
+                    t.setTime(rs.getString("create_time"));
+                    t.setTwitterId(rs.getString("tweet_id"));
+                    t.setText(rs.getString("text"));
+                    list.add(t);
+                }
+            }
+            pstmt.close();
+            releaseConnection(con);
+            Collections.sort(list); // sort
+            return list;
+        } catch (Exception e) { // general exception caught here.
+            try {
+                if (con != null)
+                    con.close();
+            } catch (SQLException e2) { /* ignore */
+            }
+            throw e;
+        }
+    }
+
+    public List<Twitter> retrieveTwitter(String userId) throws Exception {
+        Connection con = null;
+        try {
+            con = getConnection();
+
+            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.create_time, t.tweet_id, t.text, t.hashtag  from " + tableName
+                    + " AS t where t.user_id=?");
+            pstmt.setString(1, userId);
             ResultSet rs = pstmt.executeQuery();
 
             List<Twitter> list = new ArrayList<>();
             while (rs.next()) {
                 Twitter t = new Twitter();
                 t.setScore(rs.getString("score"));
-                t.setTime(rs.getString("time"));
+                t.setTime(rs.getString("create_time"));
                 t.setTwitterId(rs.getString("tweet_id"));
                 t.setText(rs.getString("text"));
                 list.add(t);

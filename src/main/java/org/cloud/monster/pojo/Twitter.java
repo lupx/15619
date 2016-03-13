@@ -21,7 +21,7 @@ public class Twitter implements Comparable<Twitter> {
 
     private String text;
 
-//    private String hashTag;
+    private String hashTag;
 
     public String getScore() {
         return score;
@@ -63,13 +63,13 @@ public class Twitter implements Comparable<Twitter> {
         this.text = text;
     }
 
-//    public String getHashTag() {
-//        return hashTag;
-//    }
+    public String getHashTag() {
+        return hashTag;
+    }
 
-//    public void setHashTag(String hashTag) {
-//        this.hashTag = hashTag;
-//    }
+    public void setHashTag(String hashTag) {
+        this.hashTag = hashTag;
+    }
 
 
     @Override

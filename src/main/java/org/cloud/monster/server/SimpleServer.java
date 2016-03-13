@@ -5,6 +5,8 @@ import io.undertow.examples.UndertowExample;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
+import org.cloud.monster.cache.LRUCache;
+import org.cloud.monster.dataaccess.hbase.HBaseDao;
 import org.cloud.monster.dataaccess.mysql.TwitterDao;
 import org.cloud.monster.pojo.Twitter;
 import org.cloud.monster.util.DateUtil;
@@ -15,7 +17,8 @@ import java.math.BigInteger;
 import java.util.*;
 
 /**
- * Simply run this code, then use browser to test it!
+ * Simply runs this code by [mvn] to deploy servers for tests.
+ *
  * @author PeixinLu
  */
 @UndertowExample("Hello World")
@@ -24,17 +27,30 @@ public class SimpleServer {
 
     private static final String TEAM_AWS_ACCOUNT_ID;
 
+    /**
+     * input the EC2-server's dns into info.properties.
+     */
     private static final String DNS;
-//
+
+
     private static final BigInteger secretKey;
+
+    /**
+     * TEST_TYPEs: q1, q2mysql, q2hbase
+     */
+    private static final String TEST_TYPE;
+
+
+    /**
+     * CACHE.
+     */
+//    private static LRUCache<String, String> cache;
 
     /**
      * TEST: only one dao here.
      * Further, we could provide a array of daos.
      */
     private static TwitterDao twitterDao;
-
-//    private static String url;
 
     static {
         Properties properties = new Properties();
@@ -46,36 +62,40 @@ public class SimpleServer {
         TEAM_ID = properties.getProperty("team_id");
         TEAM_AWS_ACCOUNT_ID = properties.getProperty("team_aws_account_id");
         secretKey = new BigInteger(properties.getProperty("secret"));
-        DNS = "ec2-54-172-11-79.compute-1.amazonaws.com";
+        DNS = properties.getProperty("dns");
         twitterDao = new TwitterDao("jdbc:mysql://localhost/twitter");
-//        url = "jdbc:mysql://localhost/twitter";
-//        DNS = "localhost";
+        TEST_TYPE = properties.getProperty("testType");
+
+        // cache size = 5000
+//        cache = new LRUCache<>(5000);
     }
 
     public static void main(final String[] args) {
-        /**
-         * q1 server:
-         */
-//        Undertow server = Undertow.builder()
-//                .addHttpListener(80, DNS)
-//                .setHandler(new HttpHandler() {
-//                    @Override
-//                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
-//                        Map<String, Deque<String>> params = exchange.getQueryParameters();
-//                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
-//                        String key = params.get("key").getFirst();
-//                        String message = params.get("message").getFirst();
-//                        String rst = decrypt(key, message);
-//                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-//                                + DateUtil.currentTime() + "\n" + rst + "\n");
-//                    }
-//                }).build();
+        if (TEST_TYPE.equals("q1")) {
+            /**
+             * q1 server:
+             */
+            Undertow server = Undertow.builder()
+                .addHttpListener(80, DNS)
+                .setHandler(new HttpHandler() {
+                    @Override
+                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                        Map<String, Deque<String>> params = exchange.getQueryParameters();
+                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+                        String key = params.get("key").getFirst();
+                        String message = params.get("message").getFirst();
+                        String rst = decrypt(key, message);
+                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+                                + DateUtil.currentTime() + "\n" + rst + "\n");
+                    }}).build();
+            server.start();
+        }
 
-
-        /**
-         * q2 server:
-         */
-        Undertow server = Undertow.builder()
+        if (TEST_TYPE.equals("q2mysql")) {
+            /**
+             * q2 server for MySQL:
+             */
+            Undertow server = Undertow.builder()
                 .addHttpListener(80, DNS)
                 .setHandler(new HttpHandler() {
                     @Override
@@ -84,17 +104,63 @@ public class SimpleServer {
                         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
                         String userId = params.get("userid").getFirst();
                         String hashTag = params.get("hashtag").getFirst();
+//                        String cachekey = userId + "#" + hashTag;
+//
+//                        if (cache.containsKey(cachekey)) {
+//                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+//                                    + cache.get(cachekey) + "\n" + "\n");
+//                            return;
+//                        }
                         List<Twitter> list = null;
                         try {
                             list = twitterDao.retrieveTwitter(userId, hashTag);
                         } catch (Exception e) {
-
+                            e.printStackTrace();
+                            System.out.println(e);
                         }
+                        String result = buildResponse(list);
+//                        cache.put(cachekey, result);
                         exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-                                + buildResponse(list) + "\n");
+                                + result + "\n" + "\n");
                     }
                 }).build();
-        server.start();
+            server.start();
+        }
+
+        if (TEST_TYPE.equals("q2hbase")) {
+            /**
+             * q2 server for HBase:
+             */
+            Undertow server = Undertow.builder()
+                    .addHttpListener(80, DNS)
+                    .setHandler(new HttpHandler() {
+                        @Override
+                        public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                        Map<String, Deque<String>> params = exchange.getQueryParameters();
+                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+                        String userId = params.get("userid").getFirst();
+                        String hashTag = params.get("hashtag").getFirst();
+//                        String cachekey = userId + "#" + hashTag;
+//                        if (cache.containsKey(cachekey)) {
+//                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+//                                    + cache.get(cachekey) + "\n" + "\n");
+//                            return;
+//                        }
+                        List<Twitter> list = null;
+                        try {
+                            list = HBaseDao.retrieveTweets(userId + "#" + hashTag);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            System.out.println(e);
+                        }
+                        String result = buildResponse(list);
+//                        cache.put(cachekey, result);
+                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+                                + result + "\n" + "\n");
+                        }
+                    }).build();
+            server.start();
+        }
     }
 
     public static String decrypt(String keyParameter, String message) {
