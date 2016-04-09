@@ -53,8 +53,24 @@ public class TwitterDao {
      * Gives a specific db url to connect.
      * @param url
      */
-    public TwitterDao(String url) {
+    public TwitterDao(String url) throws Exception {
         this.url = url;
+//        this.initializePool(url);
+    }
+
+    private void initializePool(String url)  throws  Exception {
+        try {
+            Class.forName(jdbcDriver);
+        } catch (ClassNotFoundException e) {
+            throw e;
+        }
+        for (int i = 0 ; i < 1000; i++) {
+            try {
+                connectionPool.add(DriverManager.getConnection(url, DB_USER_NAME, DB_PASSWORD));
+            } catch (SQLException e) {
+                throw e;
+            }
+        }
     }
 
 
@@ -64,33 +80,25 @@ public class TwitterDao {
      * @param hashTag
      * @return
      */
-    public List<Twitter> retrieveTwitter(String userId, String hashTag) throws Exception {
+    public List<String> retrieveTwitter(String userId, String hashTag) throws Exception {
         Connection con = null;
         try {
             con = getConnection();
 
 //            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.create_time, t.tweet_id, t.text  from " + tableName
 //                    + " AS t where t.user_id=? and t.hashtag=?");
-            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.create_time, t.tweet_id, t.text, t.hashtag  from " + tableName
-                    + " AS t where t.user_id=?"); // test
+            PreparedStatement pstmt = con.prepareStatement("SELECT t.content from " + tableName
+                    + " AS t where t.user_id=? and binary t.hashtag=?"); // test
             pstmt.setString(1, userId);
-//            pstmt.setString(2, hashTag);
+            pstmt.setString(2, hashTag);
             ResultSet rs = pstmt.executeQuery();
 
-            List<Twitter> list = new ArrayList<>();
+            List<String> list = new ArrayList<String>();
             while (rs.next()) {
-                if (rs.getString("hashtag").equals(hashTag)) {
-                    Twitter t = new Twitter();
-                    t.setScore(rs.getString("score"));
-                    t.setTime(rs.getString("create_time"));
-                    t.setTwitterId(rs.getString("tweet_id"));
-                    t.setText(rs.getString("text"));
-                    list.add(t);
-                }
+                list.add(rs.getString("content"));
             }
             pstmt.close();
             releaseConnection(con);
-            Collections.sort(list); // sort
             return list;
         } catch (Exception e) { // general exception caught here.
             try {
@@ -102,28 +110,22 @@ public class TwitterDao {
         }
     }
 
-    public List<Twitter> retrieveTwitter(String userId) throws Exception {
+    public List<String> retrieveTwitter(String md5key) throws Exception {
         Connection con = null;
         try {
             con = getConnection();
 
-            PreparedStatement pstmt = con.prepareStatement("SELECT t.score, t.create_time, t.tweet_id, t.text, t.hashtag  from " + tableName
-                    + " AS t where t.user_id=?");
-            pstmt.setString(1, userId);
+            PreparedStatement pstmt = con.prepareStatement("SELECT t.content  from " + tableName
+                    + " AS t where t.id=?");
+            pstmt.setString(1, md5key);
             ResultSet rs = pstmt.executeQuery();
 
-            List<Twitter> list = new ArrayList<>();
+            List<String> list = new ArrayList<String>();
             while (rs.next()) {
-                Twitter t = new Twitter();
-                t.setScore(rs.getString("score"));
-                t.setTime(rs.getString("create_time"));
-                t.setTwitterId(rs.getString("tweet_id"));
-                t.setText(rs.getString("text"));
-                list.add(t);
+                list.add(rs.getString("content"));
             }
             pstmt.close();
             releaseConnection(con);
-            Collections.sort(list); // sort
             return list;
         } catch (Exception e) { // general exception caught here.
             try {
@@ -135,10 +137,12 @@ public class TwitterDao {
         }
     }
 
-    private synchronized Connection getConnection() throws Exception {
-        if (connectionPool.size() > 0) {
-            return connectionPool.remove(connectionPool.size() - 1);
-        }
+    private Connection getConnection() throws Exception {
+//        synchronized (connectionPool) {
+            if (connectionPool.size() > 0) {
+                return connectionPool.remove(connectionPool.size() - 1);
+            }
+//        }
 
         try {
             Class.forName(jdbcDriver);
@@ -153,8 +157,10 @@ public class TwitterDao {
         }
     }
 
-    private synchronized void releaseConnection(Connection con) {
-        connectionPool.add(con);
+    private void releaseConnection(Connection con) {
+//        synchronized (connectionPool) {
+            connectionPool.add(con);
+//        }
     }
 
 

@@ -125,7 +125,7 @@ public class Twitter implements Comparable<Twitter> {
         t4.setTwitterId("476034778891169793");
         t4.setText("adfadfadsffadsfdsfasdf");
 
-        List<Twitter> list = new ArrayList<>();
+        List<Twitter> list = new ArrayList<Twitter>();
 
 //        list.add(t1);
 //        list.add(t2);

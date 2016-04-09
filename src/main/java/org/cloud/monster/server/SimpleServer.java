@@ -6,15 +6,20 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.cloud.monster.cache.LRUCache;
+import org.cloud.monster.dataaccess.hbase.HBaseAsyncDao;
 import org.cloud.monster.dataaccess.hbase.HBaseDao;
+import org.cloud.monster.dataaccess.mysql.HikariDao;
 import org.cloud.monster.dataaccess.mysql.TwitterDao;
 import org.cloud.monster.pojo.Twitter;
 import org.cloud.monster.util.DateUtil;
 import org.cloud.monster.util.Decrypt;
+import org.cloud.monster.util.MD5Util;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Simply runs this code by [mvn] to deploy servers for tests.
@@ -32,25 +37,25 @@ public class SimpleServer {
      */
     private static final String DNS;
 
-
     private static final BigInteger secretKey;
 
     /**
      * TEST_TYPEs: q1, q2mysql, q2hbase
      */
-    private static final String TEST_TYPE;
-
+    private static final String SERVER_TYPE;
 
     /**
      * CACHE.
      */
-//    private static LRUCache<String, String> cache;
+    private static LRUCache<String, String> cache;
 
     /**
      * TEST: only one dao here.
      * Further, we could provide a array of daos.
      */
     private static TwitterDao twitterDao;
+
+    //private static Executor executor;
 
     static {
         Properties properties = new Properties();
@@ -63,104 +68,265 @@ public class SimpleServer {
         TEAM_AWS_ACCOUNT_ID = properties.getProperty("team_aws_account_id");
         secretKey = new BigInteger(properties.getProperty("secret"));
         DNS = properties.getProperty("dns");
-        twitterDao = new TwitterDao("jdbc:mysql://localhost/twitter");
-        TEST_TYPE = properties.getProperty("testType");
+//        try {
+//            twitterDao = new TwitterDao("jdbc:mysql://localhost/twitter");
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            System.out.println("Connections get failed.");
+//        }
+        SERVER_TYPE = properties.getProperty("servertype");
 
         // cache size = 5000
-//        cache = new LRUCache<>(5000);
+        //cache = new LRUCache<String, String>(1000000);
+
+        //executor = Executors.newFixedThreadPool(6);
     }
 
     public static void main(final String[] args) {
-        if (TEST_TYPE.equals("q1")) {
-            /**
-             * q1 server:
-             */
-            Undertow server = Undertow.builder()
-                .addHttpListener(80, DNS)
-                .setHandler(new HttpHandler() {
-                    @Override
-                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
-                        Map<String, Deque<String>> params = exchange.getQueryParameters();
-                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
-                        String key = params.get("key").getFirst();
-                        String message = params.get("message").getFirst();
-                        String rst = decrypt(key, message);
-                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-                                + DateUtil.currentTime() + "\n" + rst + "\n");
-                    }}).build();
-            server.start();
-        }
 
-        if (TEST_TYPE.equals("q2mysql")) {
-            /**
-             * q2 server for MySQL:
-             */
-            Undertow server = Undertow.builder()
-                .addHttpListener(80, DNS)
-                .setHandler(new HttpHandler() {
-                    @Override
-                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
-                        Map<String, Deque<String>> params = exchange.getQueryParameters();
-                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
-                        String userId = params.get("userid").getFirst();
-                        String hashTag = params.get("hashtag").getFirst();
-//                        String cachekey = userId + "#" + hashTag;
-//
-//                        if (cache.containsKey(cachekey)) {
-//                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-//                                    + cache.get(cachekey) + "\n" + "\n");
-//                            return;
-//                        }
-                        List<Twitter> list = null;
-                        try {
-                            list = twitterDao.retrieveTwitter(userId, hashTag);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            System.out.println(e);
-                        }
-                        String result = buildResponse(list);
-//                        cache.put(cachekey, result);
-                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-                                + result + "\n" + "\n");
-                    }
-                }).build();
-            server.start();
-        }
-
-        if (TEST_TYPE.equals("q2hbase")) {
-            /**
-             * q2 server for HBase:
-             */
+        if (SERVER_TYPE.equals("mysql")) {
             Undertow server = Undertow.builder()
                     .addHttpListener(80, DNS)
                     .setHandler(new HttpHandler() {
                         @Override
                         public void handleRequest(final HttpServerExchange exchange) throws Exception {
-                        Map<String, Deque<String>> params = exchange.getQueryParameters();
-                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
-                        String userId = params.get("userid").getFirst();
-                        String hashTag = params.get("hashtag").getFirst();
-//                        String cachekey = userId + "#" + hashTag;
-//                        if (cache.containsKey(cachekey)) {
-//                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-//                                    + cache.get(cachekey) + "\n" + "\n");
-//                            return;
-//                        }
-                        List<Twitter> list = null;
-                        try {
-                            list = HBaseDao.retrieveTweets(userId + "#" + hashTag);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            System.out.println(e);
-                        }
-                        String result = buildResponse(list);
-//                        cache.put(cachekey, result);
-                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
-                                + result + "\n" + "\n");
+                            if (exchange.getRelativePath().equals("/q1")) {
+                                // q1 test
+                                exchange.dispatch(new HttpHandler() {
+                                    @Override
+                                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                                        Map<String, Deque<String>> params = exchange.getQueryParameters();
+                                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+                                        String key = params.get("key").getFirst();
+                                        String message = params.get("message").getFirst();
+                                        String rst = decrypt(key, message);
+                                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+                                                + DateUtil.currentTime() + "\n" + rst + "\n");
+                                    }
+                                });
+                            } else if (exchange.getRelativePath().equals("/q2")) {
+                                // q2 test
+                                exchange.dispatch(new HttpHandler() {
+                                    @Override
+                                    public void handleRequest(HttpServerExchange httpServerExchange) throws Exception {
+                                        Map<String, Deque<String>> params = httpServerExchange.getQueryParameters();
+                                        httpServerExchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+                                        String userId = params.get("userid").getFirst();
+                                        String hashTag = params.get("hashtag").getFirst();
+                                        String key = userId + hashTag;
+            //                        if (cache.containsKey(key)) {
+            //                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+            //                                    + cache.get(key) + "\n" + "\n");
+            //                            return;
+            //                        }
+                                        List<String> list = null;
+                                        try {
+                                            list = HikariDao.retrieveTwitter(MD5Util.getMD5(key));
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                            System.out.println(e);
+                                        }
+                                        String result = buildResponse(list);
+            //                        cache.put(key, result);
+                                        httpServerExchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+                                                + result + "\n");
+                                    }
+                                });
+                            } else {
+                                    exchange.dispatch(new HttpHandler() {
+                                    // q3 test
+                                    @Override
+                                    public void handleRequest(HttpServerExchange httpServerExchange) throws Exception {
+                                        Map<String, Deque<String>> params = httpServerExchange.getQueryParameters();
+                                        httpServerExchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+
+
+                                        String start_date = params.get("start_date").getFirst().replace("-","");
+                                        String end_date = params.get("end_date").getFirst().replace("-","");
+                                        String start_userid = params.get("start_userid").getFirst();
+                                        String end_userid = params.get("end_userid").getFirst();
+
+                                        String wordpara = params.get("words").getFirst();
+                                        String[] words = wordpara.split(",");
+                                        Map<String, Integer> wordmap = new HashMap<>();
+                                        wordmap.put(words[0], 0);
+                                        wordmap.put(words[1], 0);
+                                        wordmap.put(words[2], 0);
+
+            //                        if (cache.containsKey(key)) {
+            //                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+            //                                    + cache.get(key) + "\n" + "\n");
+            //                            return;
+            //                        }
+
+                                        List<String> result = null;
+                                        try {
+                                            result = HikariDao.retrieveRangeWordCount(start_date, end_date, start_userid, end_userid);
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                            System.out.println(e);
+                                        }
+                                        for (String str: result) {
+                                            if (!str.contains(words[0]) && !str.contains(words[1]) && !str.contains(words[2])) {
+                                                continue;
+                                            }
+                                            String[] parts = str.split("\\|");
+                                            for (int i = 0; i < parts.length; i++) {
+                                                String[] wordcount = parts[i].split(":");
+                                                String word = wordcount[0];
+                                                if (wordmap.containsKey(word)) {
+                                                    wordmap.put(word, wordmap.get(word) + Integer.parseInt(wordcount[1]));
+                                                }
+                                            }
+                                        }
+
+            //                        cache.put(key, result);
+                                        StringBuilder stringBuilder = new StringBuilder();
+                                        stringBuilder.append(TEAM_ID+","+TEAM_AWS_ACCOUNT_ID+"\n"
+                                                + words[0] + ":" + wordmap.get(words[0]) + "\n"
+                                                + words[1] + ":" + wordmap.get(words[1]) + "\n"
+                                                + words[2] + ":" + wordmap.get(words[2]) + "\n");
+                                        httpServerExchange.getResponseSender().send(stringBuilder.toString());
+                                    }
+                                });
+                            }
                         }
                     }).build();
             server.start();
         }
+
+        if (SERVER_TYPE.equals("hbase")) {
+            Undertow server = Undertow.builder()
+                    .addHttpListener(80, DNS)
+                    .setHandler(new HttpHandler() {
+                        @Override
+                        public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                            if (exchange.getRelativePath().equals("/q1")) {
+                                // q1 test
+                                exchange.dispatch(new HttpHandler() {
+                                    @Override
+                                    public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                                        Map<String, Deque<String>> params = exchange.getQueryParameters();
+                                        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+                                        String key = params.get("key").getFirst();
+                                        String message = params.get("message").getFirst();
+                                        String rst = decrypt(key, message);
+                                        exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+                                                + DateUtil.currentTime() + "\n" + rst + "\n");
+                                    }
+                                });
+                            } else if (exchange.getRelativePath().equals("/q2")) {
+                                // q2 hbase handler
+                                exchange.dispatch(new HttpHandler() {
+                                    @Override
+                                    public void handleRequest(HttpServerExchange httpServerExchange) throws Exception {
+                                        Map<String, Deque<String>> params = httpServerExchange.getQueryParameters();
+                                        httpServerExchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+                                        String userId = params.get("userid").getFirst();
+                                        String hashTag = params.get("hashtag").getFirst();
+                                        String key = userId + hashTag;
+    //                        if (cache.containsKey(key)) {
+    //                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+    //                                    + cache.get(key) + "\n");
+    //                            return;
+    //                        }
+                                        String result = null;
+                                        try {
+                                            result = HBaseAsyncDao.retrieveTweets(MD5Util.getMD5(key));
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                            System.out.println(e);
+                                        }
+    //                        cache.put(key, result);
+                                        httpServerExchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+                                                + result + "\n");
+                                    }
+                                });
+                            } else {
+                                //q3 hbase handler ...
+                                exchange.dispatch(new HttpHandler() {
+                                    // q3
+                                    @Override
+                                    public void handleRequest(HttpServerExchange httpServerExchange) throws Exception {
+                                        Map<String, Deque<String>> params = httpServerExchange.getQueryParameters();
+                                        httpServerExchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
+
+                                        String startDate = params.get("start_date").getFirst().replace("-","");
+                                        String endDate = params.get("end_date").getFirst().replace("-","");
+                                        String startUid = params.get("start_userid").getFirst();
+                                        String endUid = params.get("end_userid").getFirst();
+
+                                        String wordpara = params.get("words").getFirst();
+                                        String[] words = wordpara.split(",");
+
+                                        Map<String, Integer> wordmap = new HashMap<>();
+
+                                        wordmap.put(words[0], 0);
+                                        wordmap.put(words[1], 0);
+                                        wordmap.put(words[2], 0);
+
+                                        StringBuilder sb = new StringBuilder();
+                                        if (startUid.length() != 10) {
+                                            for (int i = 0; i < 10 - startUid.length(); i++) {
+                                                sb.append("0");
+                                            }
+                                        }
+                                        String startKey = sb.toString() + startUid + startDate;
+
+                                        sb = new StringBuilder();
+                                        if (endUid.length() != 10) {
+                                            for (int i = 0; i < 10 - endUid.length(); i++) {
+                                                sb.append("0");
+                                            }
+                                        }
+                                        String endKey = sb.toString() + endUid + endDate;
+
+            //                        if (cache.containsKey(key)) {
+            //                            exchange.getResponseSender().send(TEAM_ID + "," + TEAM_AWS_ACCOUNT_ID + "\n"
+            //                                    + cache.get(key) + "\n" + "\n");
+            //                            return;
+            //                        }
+                                        List<String> result = null;
+                                        try {
+                                            result = HBaseAsyncDao.retrieveRange(startKey, endKey, startDate, endDate);
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                            System.out.println(e);
+                                        }
+
+                                        for (String str: result) {
+                                            if (!str.contains(words[0]) && !str.contains(words[1]) && !str.contains(words[2])) {
+                                                continue;
+                                            }
+                                            String[] parts = str.split("\\|");
+                                            for (int i = 0; i < parts.length; i++) {
+                                                String[] wordcount = parts[i].split(":");
+                                                String word = wordcount[0];
+                                                if (wordmap.containsKey(word)) {
+                                                    wordmap.put(word, wordmap.get(word) + Integer.parseInt(wordcount[1]));
+                                                }
+                                            }
+                                        }
+
+            //                        cache.put(key, result);
+
+                                        StringBuilder stringBuilder = new StringBuilder();
+                                        stringBuilder.append(TEAM_ID+","+TEAM_AWS_ACCOUNT_ID+"\n"
+                                                + words[0] + ":" + wordmap.get(words[0]) + "\n"
+                                                + words[1] + ":" + wordmap.get(words[1]) + "\n"
+                                                + words[2] + ":" + wordmap.get(words[2]) + "\n");
+                                        httpServerExchange.getResponseSender().send(stringBuilder.toString());
+                                    }
+                                });
+                            }
+                        }
+                    }).build();
+            server.start();
+        }
+    }
+
+    private static void countWord (List<String> list, Map<String, Integer> wordmap, String[] words) throws Exception{
+
     }
 
     public static String decrypt(String keyParameter, String message) {
@@ -246,11 +412,11 @@ public class SimpleServer {
         return sb.toString();
     }
 
-    private static String buildResponse(List<Twitter> list) {
+    private static String buildResponse(List<String> list) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < list.size(); i ++) {
+        for (int i = 0; i < list.size(); i++) {
             if (i != list.size() - 1) {
-                sb.append(list.get(i).toString()).append("\n");
+                sb.append(list.get(i)).append("\n");
             } else {
                 sb.append(list.get(i));
             }

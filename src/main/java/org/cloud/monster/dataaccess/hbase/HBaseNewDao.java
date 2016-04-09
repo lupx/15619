@@ -8,16 +8,15 @@ package org.cloud.monster.dataaccess.hbase;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
+//import org.apache.hadoop.hbase.ipc.HBaseClient;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.log4j.Level;
+import org.apache.hadoop.ipc.Server;
 import org.apache.log4j.Logger;
-import org.cloud.monster.pojo.Twitter;
 import org.cloud.monster.util.MD5Util;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
@@ -25,7 +24,7 @@ import java.util.Properties;
  *
  * @author  Peixin Lu
  */
-public class HBaseDao {
+public class HBaseNewDao {
 
     /**
      * The private IP address of HBase master node.
@@ -54,14 +53,14 @@ public class HBaseDao {
 //    private static List<Connection> conn_pool;
 
 
-    private static List<HConnection> conn_pool;
+//    private static List<HConnection> conn_pool;
 
 //    /**
 //     * HBase configuration
 //     */
     private static Configuration conf;
 
-    private static HConnection conn;
+    private static Connection conn;
 
     /**
      * Logger.
@@ -71,7 +70,7 @@ public class HBaseDao {
     static{
         Properties properties = new Properties();
         try {
-            properties.load(HBaseDao.class.getResourceAsStream("/info.properties"));
+            properties.load(HBaseNewDao.class.getResourceAsStream("/info.properties"));
         } catch (IOException io) {
             System.out.println(io);
         }
@@ -88,9 +87,10 @@ public class HBaseDao {
         }
 //        conn_pool = new ArrayList<>();
         try {
-            conn = HConnectionManager.createConnection(conf);
+            conn = ConnectionFactory.createConnection(conf);
         } catch (IOException io) {
         }
+
     }
 
 //    private static void initializeConnection() throws IOException {
@@ -132,9 +132,11 @@ public class HBaseDao {
      */
     public static String retrieveTweets(String rowKey) throws IOException {
 
-        HTableInterface twitterTable = conn.getTable(Bytes.toBytes("twitter"));
+//        HTableInterface twitterTable = conn.getTable(Bytes.toBytes("twitter"));
 
-        Get get = new Get(Bytes.toBytes(rowKey));
+        Table twitterTable = conn.getTable(TableName.valueOf("twitter"));
+
+        Get get = new Get(Bytes.toBytes(rowKey.toString()));
 
         get.addColumn(Bytes.toBytes("info"), Bytes.toBytes("data"));
 
