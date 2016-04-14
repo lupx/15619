@@ -8,7 +8,7 @@ import java.security.MessageDigest;
  */
 public class MD5Util {
     public static void main(String[] args) {
-        String result = getMD5("1646547055TheLostPlanetinSeoul");
+        String result = getMD5("1646547d55TheLostPlanetinSeoul");
         System.out.println(result);
     }
 

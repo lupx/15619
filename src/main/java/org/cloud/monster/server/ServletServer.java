@@ -6,8 +6,8 @@ import io.undertow.examples.UndertowExample;
 import io.undertow.server.handlers.PathHandler;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
-import org.cloud.monster.servlet.HeartBeatAndAuthServlet;
-import org.cloud.monster.servlet.HelloServlet;
+//import org.cloud.monster.servlet.HeartBeatAndAuthServlet;
+//import org.cloud.monster.servlet.HelloServlet;
 
 import javax.servlet.ServletException;
 
@@ -42,10 +42,10 @@ public class ServletServer {
                         .setContextPath("")
                         .setDeploymentName("monster.war")
                         .addServlets(
-                                servlet("HelloServlet", HelloServlet.class)
-                                        .addMapping("/*"), // to access this, use :  http://localhost:8080/monster
-                                servlet("HeartBeatAndAuthServlet", HeartBeatAndAuthServlet.class)
-                                        .addMapping("/q1")  // q1 request endpoint
+//                                servlet("HelloServlet", HelloServlet.class)
+//                                        .addMapping("/*"), // to access this, use :  http://localhost:8080/monster
+//                                servlet("HeartBeatAndAuthServlet", HeartBeatAndAuthServlet.class)
+//                                        .addMapping("/q1")  // q1 request endpoint
                         );
 
                 DeploymentManager manager = defaultContainer().addDeployment(servletBuilder);
